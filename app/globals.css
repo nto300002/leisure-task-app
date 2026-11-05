@@ -944,3 +944,17 @@ footer {
     font-size: 13px;
   }
 }
+
+@media (max-width: 700px) {
+  .sidebar nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+  }
+  .nav-item {
+    justify-content: center;
+    padding: 9px 4px;
+    font-size: 10px;
+    white-space: normal;
+  }
+}
