@@ -9,7 +9,11 @@
 - 完全JSONバックアップ・検証付き取り込み・共有範囲を守るMarkdown出力。
 - 容量上限5MiB／10,000行、終了用予約、409競合後の終了キー置換、全削除時の操作世代更新。
 
-GitHubのソースは公開。Sitesアプリのアクセス範囲は本人限定です。個人記録や実行環境のDB、認証情報はこのリポジトリに含めません。`fixtures/` は架空の試験データです。
+GitHubのソースは公開。Sitesは公開ページを誰でも閲覧できます。記録編集・データ管理は管理者専用です。個人記録や実行環境のDB、認証情報はこのリポジトリに含めません。`fixtures/` は架空の試験データです。
+
+## 訪問者向けページ
+
+[公開ページ](https://leisure-task-naoto-20261105.hherocl278.chatgpt.site/journal)には、管理者が「公開ページに掲載する」を選んだ記録だけを表示します。「試したこと」「余暇のできごと」「ひとこと」で絞り込めます。[管理画面](https://leisure-task-naoto-20261105.hherocl278.chatgpt.site/admin)から掲載を変更できます。[仕様と検証](docs/PUBLIC-JOURNAL.md)。
 
 ## 実装・検証の記録
 
@@ -48,4 +52,4 @@ npm run dev
 
 React / TypeScript / Vinext、Cloudflare Workers、D1、Zod。すべての個人データ操作を認証済み本人IDに限定し、同一オリジン検査を行います。D1 batch内でアカウント版の比較更新と行更新を確定します。履歴からの自動調整、外部アクセス解析、R2保存はありません。
 
-Sitesへの公開はプラグインのsource helperでソース同期と成果物のパッケージを行い、そのcommitに対応するprivate deploymentを作成します。`.openai/hosting.json` のproject_idはこのサイトの識別子であり、認証資格情報ではありません。別サイトへ複製する場合は、新規登録で返されたIDへ変更してください。
+Sitesへの公開はプラグインのsource helperでソース同期と成果物のパッケージを行い、現在の公開範囲に対応するdeploymentを作成します。`.openai/hosting.json` のproject_idはこのサイトの識別子であり、認証資格情報ではありません。別サイトへ複製する場合は、新規登録で返されたIDへ変更してください。

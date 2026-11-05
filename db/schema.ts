@@ -54,3 +54,5 @@ export const catalog_snapshots = entity("catalog_snapshots");
 export const tombstones = entity("tombstones");
 
 export const runtime_chunks = entity("runtime_chunks");
+
+export const public_entries = entity("public_entries");

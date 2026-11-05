@@ -1,3 +1,5 @@
+import { publicPost } from "../../../lib/publication";
+import { administrator } from "../../../lib/admin";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { read, commit } from "../../../lib/store";
 import {
@@ -59,9 +61,11 @@ export async function GET() {
   try {
     const user = await getChatGPTUser();
     if (!user) return reply({ error: "SIGN_IN_REQUIRED" }, 401);
+    if (!(await administrator())) return reply({ error: "ADMIN_ONLY" }, 403);
     const s = await read(user.userId);
     return reply({
       data: s.data,
+      published_ids: s.account.published_ids ?? [],
       generation_id: s.account.generation_id,
       data_revision: s.account.data_revision,
       capacity: capacity(s.data),
@@ -84,6 +88,7 @@ export async function POST(req: Request) {
   try {
     const user = await getChatGPTUser();
     if (!user) return reply({ error: "SIGN_IN_REQUIRED" }, 401);
+    if (!(await administrator())) return reply({ error: "ADMIN_ONLY" }, 403);
     if (req.headers.get("origin") !== new URL(req.url).origin)
       return reply({ error: "ORIGIN_REJECTED" }, 403);
     const text = await req.text();
@@ -278,12 +283,29 @@ export async function POST(req: Request) {
               const m = merge(s.data, p.incoming, p.choices);
               check(m.data);
               s.data = m.data;
+              a.published_ids = [];
               a.data_revision++;
               result = { imported: true };
             } else {
               if (cmd.action === "settings" && cmd.revision !== a.data_revision)
                 throw new Fault("REVISION_CONFLICT", 409);
               execute(s.data, cmd);
+              if (
+                cmd.action === "edit-execution" &&
+                cmd.publish !== undefined
+              ) {
+                if (typeof cmd.publish !== "boolean")
+                  throw new Fault("公開指定が不正です");
+                const ids = new Set<string>(a.published_ids ?? []);
+                if (cmd.publish) ids.add(cmd.id);
+                else ids.delete(cmd.id);
+                a.published_ids = [...ids];
+              }
+              a.published_ids = (a.published_ids ?? []).filter((id: string) =>
+                s.data.executions.some(
+                  (e: Data) => e.id === id && publicPost(s.data, e) !== null,
+                ),
+              );
               check(s.data);
               a.data_revision++;
               result = { saved: true };
@@ -293,12 +315,14 @@ export async function POST(req: Request) {
           } catch (e) {
             if (e instanceof Fault && e.code === "REVISION_CONFLICT") {
               s.data = structuredClone(before.data);
+              a.published_ids = before.account.published_ids ?? [];
               a.data_revision = before.account.data_revision;
               op.status = "rejected_conflict";
               result = { error: e.code, operation_id: op.id };
               status = 409;
             } else if (e instanceof Fault || (e as any)?.issues) {
               s.data = structuredClone(before.data);
+              a.published_ids = before.account.published_ids ?? [];
               a.data_revision = before.account.data_revision;
               status = e instanceof Fault ? e.status : 400;
               result = {

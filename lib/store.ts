@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { arrays, blank, key, uid, Data, Fault } from "./domain";
+import { publicPosts, type PublicPost } from "./publication";
 export type Store = {
   owner: string;
   version: number;
@@ -20,6 +21,7 @@ export async function read(owner: string): Promise<Store> {
     sessions: {},
     plans: {},
     shares: {},
+    published_ids: [],
   };
   await db
     .prepare(
@@ -121,6 +123,33 @@ export async function commit(before: Store, after: Store) {
           token,
         ),
     );
+  // Visibility is replaced in the same transaction as record edits/deletion.
+  statements.push(
+    db
+      .prepare(`DELETE FROM public_entries WHERE owner=? AND ${guard}`)
+      .bind(before.owner, before.owner, token),
+  );
+  for (const post of publicPosts(after.data, a.published_ids ?? []))
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO public_entries(owner,id,payload) SELECT ?,?,? WHERE ${guard}`,
+        )
+        .bind(before.owner, post.id, JSON.stringify(post), before.owner, token),
+    );
   const result = await db.batch(statements);
   if (!result[0].meta.changes) throw new Fault("BUSY_RETRY", 409);
+}
+
+export async function published(): Promise<PublicPost[]> {
+  const rows = await env
+    .DB!.prepare("SELECT payload FROM public_entries")
+    .all<{ payload: string }>();
+  return rows.results
+    .map((r) => JSON.parse(r.payload))
+    .sort(
+      (a, b) =>
+        (b.date ?? " ").localeCompare(a.date ?? " ") ||
+        a.id.localeCompare(b.id),
+    );
 }

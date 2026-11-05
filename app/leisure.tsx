@@ -42,6 +42,8 @@ const icons: Data = {
   settings: Settings,
   data: Database,
 };
+import { publicPost } from "../lib/publication";
+
 function save(content: string, name: string) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(
@@ -60,6 +62,7 @@ const messages: Data = {
     "別の操作で内容が変わりました。最新の状態を確認して、もう一度保存してください。",
   QUOTA_EXCEEDED:
     "保存容量の上限です。記録を整理してからやり直してください。開始済みの活動は終了できます。",
+  ADMIN_ONLY: "管理者のアカウントでログインしてください。",
   GENERATION_EXPIRED: "データが全削除されています。最新の画面に戻しました。",
   SESSION_EXPIRED: "候補の有効時間が過ぎました。入口から選び直してください。",
   OPERATION_EXPIRED: "操作キーが失効しました。最新の状態を確認してください。",
@@ -399,6 +402,14 @@ export default function Leisure() {
             );
           })}
         </nav>
+        <a
+          className="public-nav"
+          href="/journal"
+          target="_blank"
+          rel="noreferrer"
+        >
+          公開ページを見る ↗
+        </a>
         <div className="sidebar-note">
           <span className="small-flower">✳</span>
           <p>
@@ -713,13 +724,23 @@ export default function Leisure() {
                               disabled={busy}
                               className="text-button"
                               onClick={() =>
-                                d.tasks.some((t:Data)=>t.source_catalog_id===candidate.source_catalog_id&&t.deleted_at)?M({kind:"restore-catalog",id:candidate.source_catalog_id}):run(
-                                  {
-                                    action: "save-catalog",
-                                    id: candidate.source_catalog_id,
-                                  },
-                                  () => N("いつもの候補に保存しました。"),
+                                d.tasks.some(
+                                  (t: Data) =>
+                                    t.source_catalog_id ===
+                                      candidate.source_catalog_id &&
+                                    t.deleted_at,
                                 )
+                                  ? M({
+                                      kind: "restore-catalog",
+                                      id: candidate.source_catalog_id,
+                                    })
+                                  : run(
+                                      {
+                                        action: "save-catalog",
+                                        id: candidate.source_catalog_id,
+                                      },
+                                      () => N("いつもの候補に保存しました。"),
+                                    )
                               }
                             >
                               <Plus size={15} /> いつもの候補に保存
@@ -814,73 +835,84 @@ export default function Leisure() {
               <button className="primary" onClick={() => taskForm()}>
                 <Plus size={18} /> 候補を登録
               </button>
-              <label className="check-label"><input type="checkbox" checked={showDeleted} onChange={e=>SD(e.target.checked)}/>削除済みも表示する</label><div className="list">
-                {d.tasks.filter((t: Data)=>showDeleted||!t.deleted_at).length === 0 ? (
+              <label className="check-label">
+                <input
+                  type="checkbox"
+                  checked={showDeleted}
+                  onChange={(e) => SD(e.target.checked)}
+                />
+                削除済みも表示する
+              </label>
+              <div className="list">
+                {d.tasks.filter((t: Data) => showDeleted || !t.deleted_at)
+                  .length === 0 ? (
                   <Empty
                     text="まだ候補がありません"
                     detail="自分で登録するか、新しい趣味のお試し候補を保存できます。"
                   />
                 ) : (
-                  d.tasks.filter((t: Data)=>showDeleted||!t.deleted_at).map((t: Data) => (
-                    <article
-                      className={"list-card " + (t.deleted_at ? "muted" : "")}
-                      key={t.id}
-                    >
-                      <div>
-                        <div className="tags">
-                          <span className="badge">{t.duration_min}分</span>
-                          <span className="badge">
-                            {t.deleted_at
-                              ? "削除済み"
-                              : ready(t)
-                                ? "抽選に使える"
-                                : "条件の確認待ち"}
-                          </span>
-                          {stat(activity(t)).blocked && (
-                            <span className="badge">提案停止中</span>
+                  d.tasks
+                    .filter((t: Data) => showDeleted || !t.deleted_at)
+                    .map((t: Data) => (
+                      <article
+                        className={"list-card " + (t.deleted_at ? "muted" : "")}
+                        key={t.id}
+                      >
+                        <div>
+                          <div className="tags">
+                            <span className="badge">{t.duration_min}分</span>
+                            <span className="badge">
+                              {t.deleted_at
+                                ? "削除済み"
+                                : ready(t)
+                                  ? "抽選に使える"
+                                  : "条件の確認待ち"}
+                            </span>
+                            {stat(activity(t)).blocked && (
+                              <span className="badge">提案停止中</span>
+                            )}
+                          </div>
+                          <h3>{t.title}</h3>
+                          <p>{t.first_step}</p>
+                          {!ready(t) && !t.deleted_at && (
+                            <small>
+                              保存済みです。条件を確認すると抽選に使えます。
+                            </small>
                           )}
                         </div>
-                        <h3>{t.title}</h3>
-                        <p>{t.first_step}</p>
-                        {!ready(t) && !t.deleted_at && (
-                          <small>
-                            保存済みです。条件を確認すると抽選に使えます。
-                          </small>
-                        )}
-                      </div>
-                      <div className="actions">
-                        <button onClick={() => taskForm(t)}>編集</button>
-                        <button
-                          disabled={busy}
-                          onClick={() =>
-                            run({
-                              action: "soft-delete",
-                              kind: "tasks",
-                              id: t.id,
-                              revision: t.revision,
-                              restore: !!t.deleted_at,
-                            })
-                          }
-                        >
-                          {t.deleted_at ? "復元" : "削除"}
-                        </button>
-                        {!t.deleted_at && (
+                        <div className="actions">
+                          <button onClick={() => taskForm(t)}>編集</button>
                           <button
                             disabled={busy}
                             onClick={() =>
-                              toggle(activity(t), {
-                                blocked: !stat(activity(t)).blocked,
+                              run({
+                                action: "soft-delete",
+                                kind: "tasks",
+                                id: t.id,
+                                revision: t.revision,
+                                restore: !!t.deleted_at,
                               })
                             }
                           >
-                            {stat(activity(t)).blocked
-                              ? "提案を再開"
-                              : "提案を停止"}
+                            {t.deleted_at ? "復元" : "削除"}
                           </button>
-                        )}
-                      </div>
-                    </article>
-                  ))
+                          {!t.deleted_at && (
+                            <button
+                              disabled={busy}
+                              onClick={() =>
+                                toggle(activity(t), {
+                                  blocked: !stat(activity(t)).blocked,
+                                })
+                              }
+                            >
+                              {stat(activity(t)).blocked
+                                ? "提案を再開"
+                                : "提案を停止"}
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    ))
                 )}
               </div>
             </>
@@ -900,7 +932,7 @@ export default function Leisure() {
                   })
                 }
               >
-                <Plus size={18} /> 自由に記録する
+                <Plus size={18} /> 余暇のできごとを記録する
               </button>
               <div className="list">
                 {!d.executions.length ? (
@@ -934,6 +966,9 @@ export default function Leisure() {
                           <p>{e.snapshot.first_step}</p>
                         </details>
                         <small>
+                          {state.published_ids?.includes(e.id)
+                            ? "公開ページ：掲載中 · "
+                            : "公開ページ：未掲載 · "}
                           共有：
                           {
                             {
@@ -949,6 +984,8 @@ export default function Leisure() {
                           onClick={() =>
                             M({
                               kind: "record",
+                              publish:
+                                state.published_ids?.includes(e.id) ?? false,
                               item: { ...e },
                               goals: d.execution_goals
                                 .filter((g: Data) => g.execution_id === e.id)
@@ -1043,37 +1080,47 @@ export default function Leisure() {
                     <Plus size={16} /> 追加
                   </button>
                 </div>
-                <label className="check-label"><input type="checkbox" checked={showDeleted} onChange={e=>SD(e.target.checked)}/>削除済みも表示する</label>{!d.goals.length && (
+                <label className="check-label">
+                  <input
+                    type="checkbox"
+                    checked={showDeleted}
+                    onChange={(e) => SD(e.target.checked)}
+                  />
+                  削除済みも表示する
+                </label>
+                {!d.goals.length && (
                   <p>目標の入力は任意です。最大10件まで登録できます。</p>
                 )}
-                {d.goals.filter((g: Data)=>showDeleted||!g.deleted_at).map((g: Data) => (
-                  <div className="setting-row" key={g.id}>
-                    <span>
-                      {g.title}
-                      {g.deleted_at ? "（削除済み）" : ""}
-                    </span>
-                    <div className="actions">
-                      <button
-                        onClick={() => M({ kind: "goal", item: { ...g } })}
-                      >
-                        編集
-                      </button>
-                      <button
-                        onClick={() =>
-                          run({
-                            action: "soft-delete",
-                            kind: "goals",
-                            id: g.id,
-                            revision: g.revision,
-                            restore: !!g.deleted_at,
-                          })
-                        }
-                      >
-                        {g.deleted_at ? "復元" : "削除"}
-                      </button>
+                {d.goals
+                  .filter((g: Data) => showDeleted || !g.deleted_at)
+                  .map((g: Data) => (
+                    <div className="setting-row" key={g.id}>
+                      <span>
+                        {g.title}
+                        {g.deleted_at ? "（削除済み）" : ""}
+                      </span>
+                      <div className="actions">
+                        <button
+                          onClick={() => M({ kind: "goal", item: { ...g } })}
+                        >
+                          編集
+                        </button>
+                        <button
+                          onClick={() =>
+                            run({
+                              action: "soft-delete",
+                              kind: "goals",
+                              id: g.id,
+                              revision: g.revision,
+                              restore: !!g.deleted_at,
+                            })
+                          }
+                        >
+                          {g.deleted_at ? "復元" : "削除"}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </section>
               <section className="panel">
                 <h2>お試し候補の状態</h2>
@@ -1158,7 +1205,7 @@ export default function Leisure() {
               <section className="panel">
                 <h2>バックアップを取り込む</h2>
                 <p>
-                  最大5MiB。内容を検証してから、まとめて反映します。同じIDの競合は保存先を優先します。
+                  最大5MiB。内容を検証してから、まとめて反映します。同じIDの競合は保存先を優先します。取り込み後は公開ページの掲載指定が解除されます。
                 </p>
                 <input
                   aria-label="バックアップJSON"
@@ -1316,12 +1363,12 @@ export default function Leisure() {
                 {
                   task: "候補を編集",
                   record: "記録を編集",
-                  manual: "自由に記録する",
+                  manual: "余暇のできごとを記録する",
                   goal: "目標を編集",
                   stop: "ここまでで、ひと区切り",
                   "delete-record": "記録を削除",
                   "delete-all": "全データを削除",
- "restore-catalog":"保存した候補を復元",
+                  "restore-catalog": "保存した候補を復元",
                 }[modal.kind as string]
               }
             </h2>
@@ -1346,6 +1393,7 @@ export default function Leisure() {
                           ? { action: "manual", ...item }
                           : {
                               action: "edit-execution",
+                              publish: !!modal.publish && !!publicPost(d, item),
                               id: item.id,
                               revision: item.revision,
                               patch: Object.fromEntries(
@@ -1721,6 +1769,38 @@ export default function Leisure() {
                     )}
                   </>
                 )}
+                {modal.kind === "record" && (
+                  <section className="publication-control">
+                    <label className="check-label">
+                      <input
+                        type="checkbox"
+                        checked={!!modal.publish && !!publicPost(d, modal.item)}
+                        disabled={!publicPost(d, modal.item)}
+                        onChange={(e) =>
+                          M({ ...modal, publish: e.target.checked })
+                        }
+                      />
+                      公開ページに掲載する
+                    </label>
+                    <p>
+                      保存すると、以下の内容が誰でも見られるページに表示されます。共有範囲が「共有しない」の記録と実行中の記録は掲載できません。
+                    </p>
+                    {publicPost(d, modal.item) ? (
+                      <div className="public-preview">
+                        <small>掲載される内容</small>
+                        <h3>{publicPost(d, modal.item)?.title}</h3>
+                        {publicPost(d, modal.item)?.date && (
+                          <small>{publicPost(d, modal.item)?.date}</small>
+                        )}
+                        <p>{publicPost(d, modal.item)?.body || "本文なし"}</p>
+                      </div>
+                    ) : (
+                      <p>
+                        共有範囲を「専用の要約のみ」または「全文」にしてください。要約の場合は共有用の要約を入力してください。
+                      </p>
+                    )}
+                  </section>
+                )}
                 <div className="modal-actions">
                   <button type="button" onClick={() => M(null)}>
                     キャンセル
@@ -1731,7 +1811,29 @@ export default function Leisure() {
                 </div>
               </form>
             )}
-            {modal.kind === "restore-catalog" && <><p>保存済みの候補は削除されています。同じ候補を復元しますか？</p><button className="primary" disabled={busy} onClick={()=>run({action:"save-catalog",id:modal.id,restore:true},()=>{M(null);N("候補を復元しました。");})}>候補を復元する</button></>}{modal.kind === "stop" && (
+            {modal.kind === "restore-catalog" && (
+              <>
+                <p>
+                  保存済みの候補は削除されています。同じ候補を復元しますか？
+                </p>
+                <button
+                  className="primary"
+                  disabled={busy}
+                  onClick={() =>
+                    run(
+                      { action: "save-catalog", id: modal.id, restore: true },
+                      () => {
+                        M(null);
+                        N("候補を復元しました。");
+                      },
+                    )
+                  }
+                >
+                  候補を復元する
+                </button>
+              </>
+            )}
+            {modal.kind === "stop" && (
               <>
                 <p>
                   途中で終えても大丈夫。試したことにするか、自分で選べます。
