@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX `one_running_per_owner` ON `executions` (`owner`) WHERE json_extract("executions"."payload", '$.status') = 'running';--> statement-breakpoint
+CREATE UNIQUE INDEX `one_active_catalog_copy` ON `tasks` (`owner`,json_extract(payload, '$.source_catalog_id')) WHERE json_extract("tasks"."payload", '$.deleted_at') IS NULL AND json_extract("tasks"."payload", '$.source_catalog_id') IS NOT NULL;

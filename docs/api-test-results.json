@@ -1,0 +1,13 @@
+{
+  "environment": "local Vinext + D1 / mock identity",
+  "passed": [
+    "unauthenticated GET rejected",
+    "unauthenticated POST and cross-origin rejected",
+    "T24 2,000 normal keys + revision conflict + pre-expiry replacement + replay, T21 atomic stopped/tried",
+    "old rejected key terminal, payload mismatch rejected",
+    "T23 old create / replay / import requests invalidated after deletion",
+    "T15/T17 deleted-reference backup restores exact records/settings/links",
+    "5MiB-near backup exports and restores through D1 transaction (escaped payload)",
+    "original local preview dataset restored"
+  ]
+}
